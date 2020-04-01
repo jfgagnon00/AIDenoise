@@ -3,6 +3,10 @@ import pandas as pd
 import torch.nn as torch
 
 class FilterModel(torch.Module):
+    """
+    Model a time sequence to estimate a custom filtering
+    algorithm.
+    """
     def __init__(self, dimensionIn, dimensionOut):
         super().__init__()
         self._hidden1 = torch.Linear(dimensionIn, dimensionOut)
