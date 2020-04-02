@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+
 class Dataset(torch.utils.data.Dataset):
     """
     Wrap data fitlered with an custom moving average filter.
