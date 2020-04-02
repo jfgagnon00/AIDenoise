@@ -6,13 +6,14 @@ import torch
 
 
 # parameters for neural network learning
-EPOCHS = 10
-BATCH_SIZE = 32
-LEARNING_RATE = 0.002
+EPOCHS = 20
+BATCH_SIZE = 1
+LEARNING_RATE = 0.001
 
 LSTM_SEQUENCE_LENGTH = 40
-LSTM_NUM_LAYERS = 1
-LSTM_HIDDEN_LAYER_SIZE = 16  # LSTM_SEQUENCE_LENGTH
+LSTM_HIDDEN_LAYER_SIZE = 64
+
+NUM_WORKERS = 0  # 4
 
 dataset = data.Dataset("./data/filtered_positions.csv", LSTM_SEQUENCE_LENGTH)
 
@@ -40,7 +41,7 @@ def train(dataloader, model, device):
             optimizer.step()
 
             if iteration % 100 == 0:
-                print(f"iteration: {iteration:4} (epoch: {epoch:3}, batch: {batch:3}) loss: {loss.item():2.8f}")
+                print(f"iteration: {iteration:4} (epoch: {epoch:3}, batch: {batch:4}) loss: {loss.item():2.8f}")
 
             iteration += 1
 
@@ -49,9 +50,9 @@ def train(dataloader, model, device):
 
 def filter(dataset, model, device):
     print("Filter")
+
     with open("./data/new_positions.csv", "w") as output:
         output.write("CartID,Index,RawPos,MovingAverage,LSTMPos\n")
-        index = 2
 
         rawPositions = dataset.rawPositions
         rawPositions = rawPositions.reshape(rawPositions.shape[0], 1)
@@ -64,6 +65,7 @@ def filter(dataset, model, device):
         def remap(value):
             return (value - dataset.bias) / dataset.scale
 
+        index = 2
         for cartID, \
             rawPosition, \
             orignalFilter, \
@@ -92,10 +94,10 @@ if __name__ == "__main__":
         np.random.seed(0)
         torch.manual_seed(0)
 
-        dataLoader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+        dataLoader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
         device = torch.device("cuda:0" if cudaAvailable else "cpu")
-        model = model.FilterModel(device, dimensionHidden=LSTM_HIDDEN_LAYER_SIZE, numLayers=LSTM_NUM_LAYERS, batchSize=BATCH_SIZE)
+        model = model.FilterModel(device, dimensionHidden=LSTM_HIDDEN_LAYER_SIZE)
         print(f"Num parameters: {model.parameterCount()}")
 
         train(dataLoader, model, device)

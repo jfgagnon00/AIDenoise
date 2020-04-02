@@ -22,8 +22,8 @@ class Dataset(torch.utils.data.Dataset):
 
         min = np.amin(self.rawPositions)
         max = np.amax(self.rawPositions)
-        self.scale = 2.0 / (max - min)
-        self.bias = -min * self.scale - 1.0
+        self.scale = 1.0 / (max - min)
+        self.bias = -min * self.scale
 
         self.rawPositions = self.rawPositions * self.scale + self.bias
         self.filteredPositions = self.filteredPositions * self.scale + self.bias
