@@ -8,7 +8,7 @@ import torch
 
 # parameters for neural network learning
 EPOCHS = 10
-BATCH_SIZE = 64
+BATCH_SIZE = 1
 LEARNING_RATE = 0.001
 
 LSTM_SEQUENCE_LENGTH = 40
