@@ -2,12 +2,13 @@ import data
 import itertools
 import model
 import numpy as np
+import time
 import torch
 
 
 # parameters for neural network learning
-EPOCHS = 20
-BATCH_SIZE = 1
+EPOCHS = 10
+BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 
 LSTM_SEQUENCE_LENGTH = 40
@@ -15,40 +16,64 @@ LSTM_HIDDEN_LAYER_SIZE = 64
 
 NUM_WORKERS = 0  # 4
 
-dataset = data.Dataset("./data/filtered_positions.csv", LSTM_SEQUENCE_LENGTH)
+dataset = data.Dataset([
+    "./data/filtered_positions_00.csv",
+    "./data/filtered_positions_01.csv",
+    "./data/filtered_positions_02.csv",
+    "./data/filtered_positions_03.csv"
+    ])
 
 
-def train(dataloader, model, device):
+def train(model, device):
     print("Training")
+
+    # prepare dataset for the loader
+    dataset.preprocess(LSTM_SEQUENCE_LENGTH, device)
+    dataLoader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
     # pytorch objects needed for traning
     lossFunction = torch.nn.MSELoss(reduction="sum")
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    # training per say
     iteration = 0
     model.train()
+    timeBegin = time.perf_counter()
     for epoch in range(EPOCHS):
-        for batch, (x, target) in enumerate(dataLoader):
-            x = x.to(device)
-            target = target.to(device)
+        # build a pack sequence of batches
+        # dramatically improve performance of training
+        featureList = []
+        targetList = []
+        for features, target in dataLoader:
+            features = features.permute(1, 0, 2)
+            featureList.append(features)
+            targetList.append(target)
 
-            model.resetSequence(x.shape[0])
-            optimizer.zero_grad()
-            output = model(x)
-            loss = lossFunction(output, target)
-            loss.backward()
-            optimizer.step()
+        # shape is (num_batches, BATCH_SIZE, LSTM_SEQUENCE_LENGTH, dataset.numFeatures())
+        featureList = torch.nn.utils.rnn.pack_sequence(featureList)
+        targetList = torch.nn.utils.rnn.pack_sequence(targetList)
 
-            if iteration % 100 == 0:
-                print(f"iteration: {iteration:4} (epoch: {epoch:3}, batch: {batch:4}) loss: {loss.item():2.8f}")
+        # comment on reset la sequence entre les astie de batch!
+        print(featureList.batch_sizes.shape)
+        print(featureList.batch_sizes)
+        model.resetSequence(featureList.batch_sizes[0].item())
 
-            iteration += 1
+        optimizer.zero_grad()
+        output = model(featureList)
+        loss = lossFunction(output, targetList)
+        loss.backward()
+        optimizer.step()
 
-    print("Training done")
+        if iteration % 100 == 0:
+            print(f"iteration: {iteration:4} (epoch: {epoch:3} batch: {batch:4}) ")  # loss: {loss.item():2.8f}
+
+        iteration += 1
+    timeEnd = time.perf_counter()
+    print(f"Training done: {timeEnd - timeBegin:.3f}s")
 
 
 def filter(dataset, model, device):
+    return
+
     print("Filter")
 
     with open("./data/new_positions.csv", "w") as output:
@@ -94,13 +119,11 @@ if __name__ == "__main__":
         np.random.seed(0)
         torch.manual_seed(0)
 
-        dataLoader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
         device = torch.device("cuda:0" if cudaAvailable else "cpu")
-        model = model.FilterModel(device, dimensionHidden=LSTM_HIDDEN_LAYER_SIZE)
+        model = model.FilterModel(device, dimensionIn=dataset.numFeatures(), dimensionHidden=LSTM_HIDDEN_LAYER_SIZE)
         print(f"Num parameters: {model.parameterCount()}")
 
-        train(dataLoader, model, device)
+        train(model, device)
         filter(dataset, model, device)
     else:
         print("Worker")
