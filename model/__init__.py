@@ -79,7 +79,7 @@ class ConvAutoEncoderFilter(torch.nn.Module):
 
         # adapt output of autoencoder to desired output size
         # no dropout/activation here
-        layer = torch.nn.Linear(outFeatures, sequenceLength)
+        layer = torch.nn.Linear(outFeatures, 1)
         layers.append(layer)
 
         self._net = torch.nn.Sequential(*layers).to(device)
@@ -160,12 +160,11 @@ class DenseFilter(torch.nn.Module):
             layers.append(layer)
 
             if i < size - 1:
-                activation = torch.nn.LeakyReLU()
+                # activation = torch.nn.LeakyReLU()
                 # activation = torch.nn.ReLU()  # worst ever
-                # activation = torch.nn.Sigmoid()
+                activation = torch.nn.Sigmoid()
                 # activation = torch.nn.Tanh()
                 layers.append(activation)
-                pass
 
         return layers, outFeatures
 
@@ -264,7 +263,7 @@ class BasicRNN(torch.nn.Module):
         self._h = np.zeros((batchSize, 1), dtype=np.float32)
         self._h = torch.from_numpy(self._h).to(self._device)
 
-    def forward(self, x, pos):
+    def forward(self, x, pos=None):
         tmpRows = []
         for batch, hidden in zip(x, self._h):
             tmp = torch.cat([batch, hidden])

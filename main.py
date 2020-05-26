@@ -10,11 +10,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 # general parameters for training
 EPOCHS = 300  # 300
-LEARNING_RATE = 6e-5
+LEARNING_RATE = 5e-4  ## 6e-5
 TRAIN_BATCH_SIZE = 64
 TEST_BATCH_SIZE = 256
 LOG_EVERY = 1
 SAVE_EVERY = 10
+RELOAD_PREVIOUS_SESSION = True
 
 # parameters for dataset/dataloader
 SEQUENCE_LENGTH = 20
@@ -27,11 +28,11 @@ LEARNING_RATE_KEY = "learningRate"
 
 
 def createModel(device, datasetClass):
-    model_ = model.BasicRNN(device,
-                            SEQUENCE_LENGTH,
-                            1,
-                            datasetClass.NumFeatures)
-    sequenceLengthOut = 1
+    # model_ = model.BasicRNN(device,
+    #                         SEQUENCE_LENGTH,
+    #                         1,
+    #                         datasetClass.NumFeatures)
+    # sequenceLengthOut = 1
 
     # model_ = model.SimpleLinear(device,
     #                             SEQUENCE_LENGTH,
@@ -41,25 +42,26 @@ def createModel(device, datasetClass):
 
     # LSTM_HIDDEN_LAYER_SIZE = 10
     # model_ = model.LSTMFilter(device,
-    #                           dataset.numFeatures,
+    #                           datasetClass.NumFeatures,
     #                           LSTM_HIDDEN_LAYER_SIZE)
     # sequenceLengthOut = SEQUENCE_LENGTH
 
-    # ENCODER_CONV_LAYER_SIZES = [10, 5]
-    # ENCODER_CONV_KERNEL_SIZES = [5, 3]
-    # model_ = model.ConvAutoEncoderFilter(device,
-    #                                      SEQUENCE_LENGTH,
-    #                                      dataset.numFeatures,
-    #                                      ENCODER_CONV_LAYER_SIZES,
-    #                                      ENCODER_CONV_KERNEL_SIZES)
-    # sequenceLengthOut = SEQUENCE_LENGTH
+    ENCODER_CONV_LAYER_SIZES = [10, 5]
+    ENCODER_CONV_KERNEL_SIZES = [5, 3]
+    model_ = model.ConvAutoEncoderFilter(device,
+                                         SEQUENCE_LENGTH,
+                                         datasetClass.NumFeatures,
+                                         ENCODER_CONV_LAYER_SIZES,
+                                         ENCODER_CONV_KERNEL_SIZES)
+    sequenceLengthOut = 1
 
     # DENSE_LAYER_SIZES = [10, 5, 3, 3, 5, 10, SEQUENCE_LENGTH // 2]
     # DENSE_LAYER_SIZES = [10, 10]
     # DENSE_LAYER_SIZES = [20, 10, 5, 2, 5, 10, 20]
+    # DENSE_LAYER_SIZES = [10, 10, 1]
     # model_ = model.DenseFilter(device,
     #                            SEQUENCE_LENGTH,
-    #                            dataset.numFeatures,
+    #                            datasetClass.NumFeatures,
     #                            DENSE_LAYER_SIZES)
     # sequenceLengthOut = DENSE_LAYER_SIZES[-1]
 
@@ -108,11 +110,10 @@ def train(trainDataset, testDataset, model, weightFileName):
         iteration = 0.0
         sumLoss = 0.0
 
-        # faudrait peut-etre
         model.resetSequence(TRAIN_BATCH_SIZE)
         for x, target in trainDataLoader:
             # model.resetSequence(x.shape[0])
-            output = model(x, None)
+            output = model(x)
             loss = lossFunction(output, target)
             optimizer.zero_grad()
             loss.backward(retain_graph=True)
@@ -183,7 +184,7 @@ def validation(dataset, model):
             originalFilter = remap(originalFilter.item())
 
             model.resetSequence(1)
-            newFilter = model(x, None)
+            newFilter = model(x)
             newFilter = newFilter[0, -1]
             newFilter = remap(newFilter.item())
 
@@ -215,17 +216,17 @@ if __name__ == "__main__":
 
         device = torch.device("cuda:0" if cudaAvailable else "cpu")
         trainDataset = data.Dataset([
-		    "./data/filtered_positions_00.csv",
-		    "./data/filtered_positions_01.csv",
-		    "./data/filtered_positions_02.csv",
-		    "./data/filtered_positions_03.csv"
-		])
+            "./data/filtered_positions_00.csv",
+            "./data/filtered_positions_01.csv",
+            "./data/filtered_positions_02.csv",
+            "./data/filtered_positions_03.csv"
+        ])
 
         model_, sequenceLengthOut = createModel(device, type(trainDataset))
         weightFilename = f"./results/{model_.getName()}.pt"
         print(f"{model_.getName()}, num parameters: {getModelParameterCount(model_)}")
 
-        if False and os.path.exists(weightFilename):
+        if RELOAD_PREVIOUS_SESSION and os.path.exists(weightFilename):
             weights = torch.load(weightFilename)
             model_.load_state_dict(weights, strict=False)
             model_.eval()
@@ -251,7 +252,12 @@ if __name__ == "__main__":
         plt.legend()
         plt.savefig("./results/lr.png")
 
-        validatinDataset = data.Dataset("./data/filtered_positions.csv")
+        validatinDataset = data.Dataset([
+            "./data/filtered_positions_00.csv",
+            "./data/filtered_positions_01.csv",
+            "./data/filtered_positions_02.csv",
+            "./data/filtered_positions_03.csv"
+        ])
         validatinDataset.applyScaleBias(1.0, 0.0)
         validatinDataset.preprocess(device, SEQUENCE_LENGTH, sequenceLengthOut)
         validation(validatinDataset, model_)
